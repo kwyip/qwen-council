@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Qwen Councils{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><a href="{{ url_for('index') }}">Qwen Councils</a></div>
+  <form class="top-search responsive-form" action="{{ url_for('index') }}" method="get">
+    <input name="q" value="{{ search_value|default('') }}" placeholder="Search arXiv">
+    <button type="submit">Search</button>
+  </form>
+  <nav>
+    <a href="{{ url_for('blog') }}">Blog</a>
+    {% if g.user %}
+      <a class="nav-user" href="{{ url_for('profile') }}">{{ g.user.username }}</a>
+      <a href="{{ url_for('logout') }}">Log out</a>
+    {% else %}
+      <a href="{{ url_for('login') }}">Log in</a>
+      <a class="pill" href="{{ url_for('register') }}">Join</a>
+    {% endif %}
+  </nav>
+</header>
+<main class="layout">
+  {% for message in get_flashed_messages() %}<div class="flash">{{ message }}</div>{% endfor %}
+  {% block content %}{% endblock %}
+</main>
+<script>
+  document.querySelectorAll('.responsive-form').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      const button = event.submitter || form.querySelector('button[type="submit"]');
+      if (button) {
+        if (button.name) {
+          const submittedAction = document.createElement('input');
+          submittedAction.type = 'hidden';
+          submittedAction.name = button.name;
+          submittedAction.value = button.value;
+          form.appendChild(submittedAction);
+        }
+        button.dataset.originalText = button.textContent;
+        button.textContent = 'Working…';
+        button.disabled = true;
+      }
+    });
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    if (window.renderMathInElement) {
+      document.querySelectorAll('.math-render').forEach((element) => renderMathInElement(element, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '$', right: '$', display: false},
+          {left: '\\[', right: '\\]', display: true},
+          {left: '\\(', right: '\\)', display: false}
+        ],
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+        throwOnError: false,
+        errorCallback: (message, error) => {
+          console.warn('KaTeX render warning:', message, error);
+          if (!element.querySelector('.math-render-warning')) {
+            const warning = document.createElement('small');
+            warning.className = 'math-render-warning';
+            warning.textContent = 'Some mathematical notation could not be rendered; simplified source text is shown.';
+            element.appendChild(warning);
+          }
+        }
+      }));
+    }
+  });
+</script>
+</body>
+</html>

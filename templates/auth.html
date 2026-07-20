@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ mode }} · Qwen Councils{% endblock %}
+{% block content %}
+<form method="post" class="auth-card reddit-card">
+  <h1>{{ mode }}</h1>
+  <label>Username <input name="username" required></label>
+  <label>Password <input name="password" type="password" required></label>
+  {% if mode == 'Register' %}<label>Profile picture URL <input name="profile_pic" type="url" placeholder="https://example.com/avatar.png"></label>{% endif %}
+  <button type="submit">{{ mode }}</button>
+</form>
+{% endblock %}

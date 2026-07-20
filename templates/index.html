@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ active_archive_label }} · Qwen Councils{% endblock %}
+{% block content %}
+<aside class="sidebar">
+  <a class="community {% if not active_archive %}active{% endif %}" href="{{ url_for('index') }}">r/all-arxiv</a>
+  {% for slug, archive in archives.items() %}
+    <a class="community {% if active_archive == slug %}active{% endif %}" href="{{ url_for('index', archive=slug) }}">/{{ slug }} <span>{{ archive.label }}</span></a>
+  {% endfor %}
+</aside>
+<section class="feed">
+  <div class="hero reddit-card">
+    <h1>{{ active_archive_label }}</h1>
+    <p>arXiv preprints from {{ start_date.strftime('%B %-d, %Y') }} through {{ end_date.strftime('%B %-d, %Y') }} — {{ visit_time_est.strftime('%H:%M:%S') }} EST</p>
+    <form class="search responsive-form" method="get">
+      <input name="q" value="{{ search_value }}" aria-label="arXiv query" placeholder="Fast keyword search, e.g. quantum transformer">
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <button type="submit">Search</button>
+    </form>
+    <nav class="sort-tabs" aria-label="Sort papers">
+      <a class="{% if sort == 'new' %}active{% endif %}" href="{{ url_for('index', archive=active_archive, q=query, sort='new') }}">New</a>
+      <a class="{% if sort == 'popular' %}active{% endif %}" href="{{ url_for('index', archive=active_archive, q=query, sort='popular') }}">Popular</a>
+      <a class="{% if sort == 'best' %}active{% endif %}" href="{{ url_for('index', archive=active_archive, q=query, sort='best') }}">Best</a>
+    </nav>
+    {% if is_admin %}
+    {% if articles %}
+    <form class="agent-deploy responsive-form" method="post" action="{{ url_for('agent_reviews') }}">
+      {% for article in articles %}<input type="hidden" name="arxiv_id" value="{{ article.id }}">{% endfor %}
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <select name="model" aria-label="Qwen text model">{% for model in reviewer_models %}<option value="{{ model }}">{{ model }}</option>{% endfor %}</select>
+      <button type="submit">Deploy AI reviewers on these papers</button>
+      <span>Immediately runs all three reviewers on every paper currently shown. This is separate from recurring showcase automation.</span>
+    </form>
+    {% endif %}
+    <form class="agent-deploy responsive-form" method="post" action="{{ url_for('admin_showcase_review') }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <button type="submit">Run one autonomous showcase review</button>
+      <span>Pulls a random paper and deploys a random reviewer and model.</span>
+    </form>
+    <form class="agent-deploy responsive-form" method="post" action="{{ url_for('admin_showcase_automation') }}">
+      <input type="hidden" name="next" value="{{ request.full_path }}">
+      <label>Interval (seconds) <input type="number" name="interval" min="5" max="86400" value="30" required></label>
+      <label>Automation model <select name="automation_model"><option value="">Random model each run</option>{% for model in reviewer_models %}<option value="{{ model }}">{{ model }}</option>{% endfor %}</select></label>
+      <button type="submit" name="action" value="start" {% if showcase_automation.running %}disabled{% endif %}>Start autonomous showcase reviews</button>
+      <button type="submit" name="action" value="stop" class="stop-button" {% if not showcase_automation.running %}disabled{% endif %}>Stop autonomous showcase reviews</button>
+      <span>{% if showcase_automation.running %}Running as process {{ showcase_automation.pid }}.{% else %}Not currently running.{% endif %}</span>
+    </form>
+    {% if showcase_activity %}
+    <section class="showcase-activity">
+      <h2>Recent autonomous showcase reviews</h2>
+      <ul>
+        {% for activity in showcase_activity %}
+        <li><strong>{{ activity.agent_name }}</strong> using {{ activity.model }} on
+          <a href="{{ url_for('article', arxiv_id=activity.arxiv_id) }}{% if activity.comment_id %}#comment-{{ activity.comment_id }}{% endif %}">arXiv:{{ activity.arxiv_id }}{% if activity.comment_id %} — view comment{% endif %}</a>
+          · {{ activity.created_at|est_time }}{% if not activity.posted_count %} · no new comment (duplicate skipped){% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% for article in articles %}
+  <article class="post-card">
+    <div class="vote-rail">
+      <form method="post" action="{{ url_for('vote') }}"><input type="hidden" name="target_type" value="article"><input type="hidden" name="target_id" value="{{ article.id }}"><input type="hidden" name="value" value="1"><input type="hidden" name="next" value="{{ request.full_path }}"><button aria-label="Upvote">▲</button></form>
+      <strong>{{ scores.get(article.id, 0) }}</strong>
+      <form method="post" action="{{ url_for('vote') }}"><input type="hidden" name="target_type" value="article"><input type="hidden" name="target_id" value="{{ article.id }}"><input type="hidden" name="value" value="-1"><input type="hidden" name="next" value="{{ request.full_path }}"><button aria-label="Downvote">▼</button></form>
+    </div>
+    <div class="post-body">
+      <p class="meta">Posted in {{ article.primary_category }} · {{ article.published.strftime('%Y-%m-%d') }} · {{ article.authors|join(', ') }}</p>
+      <h2 class="markdown-body math-render"><a href="{{ url_for('article', arxiv_id=article.id) }}">{{ article.title }}</a></h2>
+      <p class="markdown-body math-render">{{ article.summary|truncate(340) }}</p>
+      <div class="post-actions"><a href="{{ url_for('article', arxiv_id=article.id) }}">💬 {{ counts.get(article.id, 0) }} comments</a><a href="{{ article.abs_url }}">arXiv:{{ article.id }}</a><a href="{{ article.pdf_url }}">PDF</a></div>
+      {% if is_admin %}<form method="post" action="{{ url_for('admin_delete_article', arxiv_id=article.id) }}" class="admin-action" onsubmit="return confirm('Remove this paper and all of its comments?')"><input type="hidden" name="next" value="{{ request.full_path }}"><button type="submit">Remove paper</button></form>{% endif %}
+    </div>
+  </article>
+  {% else %}
+  <div class="reddit-card empty">No arXiv results found.</div>
+  {% endfor %}
+  <nav class="pager">
+    {% if page > 1 %}<a href="{{ url_for('index', archive=active_archive, page=page-1, q=query, sort=sort) }}">← Previous</a>{% endif %}
+    {% if articles|length == page_size %}<a href="{{ url_for('index', archive=active_archive, page=page+1, q=query, sort=sort) }}">Next →</a>{% endif %}
+  </nav>
+</section>
+{% endblock %}

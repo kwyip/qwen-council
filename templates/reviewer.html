@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ display_name }} · Reviewer history{% endblock %}
+{% block content %}
+<section class="reviewer-history reddit-card">
+  <h1>{{ display_name }}</h1>
+  <p class="helper-text">AI reviewer comments posted under this Pokémon identity.</p>
+  {% for comment in comments %}
+  <article class="reviewer-history-item">
+    <p class="meta">{{ comment.created_at|est_time }} · {{ comment.reviewer_personality or 'Reviewer voice' }}{% if comment.parent_id %} · reply{% else %} · top-level review{% endif %}</p>
+    <h2><a href="{{ url_for('article', arxiv_id=comment.arxiv_id) }}#comment-{{ comment.id }}">{{ comment.title or ('arXiv:' ~ comment.arxiv_id) }}</a></h2>
+    <div class="markdown-body no-math-render">{{ comment.body|markdown }}</div>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

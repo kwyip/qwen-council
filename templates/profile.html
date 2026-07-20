@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Profile · Qwen Councils{% endblock %}
+{% block content %}
+<form method="post" class="auth-card reddit-card">
+  <h1>Your profile</h1>
+  <div class="profile-preview avatar"><span>{{ g.user.username[0]|upper }}</span>{% if g.user.profile_pic %}<img src="{{ g.user.profile_pic }}" alt="{{ g.user.username }} avatar" referrerpolicy="no-referrer" onerror="this.hidden=true">{% endif %}</div>
+  <label>Profile picture URL <input name="profile_pic" type="url" value="{{ g.user.profile_pic }}" placeholder="https://example.com/avatar.png"></label>
+  <button type="submit">Save profile</button>
+</form>
+{% endblock %}

@@ -1,0 +1,13 @@
+[project]
+name = "quantum-council"
+version = "0.1.0"
+description = "Qwen Councils, a SciRate-inspired Flask app for browsing and discussing 2026 arXiv preprints."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "Flask==3.0.3",
+    "gunicorn==22.0.0",
+]
+
+[tool.uv]
+package = false

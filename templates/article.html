@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} · Qwen Councils{% endblock %}
+{% macro render_comment(comment) %}
+<article id="comment-{{ comment.id }}" class="comment {% if comment.parent_id %}reply-comment{% endif %}">
+  <div class="avatar"><span>{{ comment.username[0]|upper }}</span>{% if comment.profile_pic %}<img src="{{ comment.profile_pic }}" alt="{{ comment.username }} avatar" referrerpolicy="no-referrer" onerror="this.hidden=true">{% endif %}</div>
+  <div class="comment-main">
+    <p class="meta"><strong>{% if comment.is_reviewer %}<a href="{{ url_for('reviewer_profile', display_name=comment.username) }}">{{ comment.username }}</a>{% else %}{{ comment.username }}{% endif %}</strong>{% if comment.reviewer_personality %} · {{ comment.reviewer_personality }}{% endif %} · {{ comment.created_at|est_time }}</p>
+    <div class="markdown-body {% if comment.is_reviewer %}no-math-render{% else %}math-render{% endif %}">{{ comment.body|markdown }}</div>
+    <div class="comment-votes">
+      <form method="post" action="{{ url_for('vote') }}"><input type="hidden" name="target_type" value="comment"><input type="hidden" name="target_id" value="{{ comment.id }}"><input type="hidden" name="value" value="1"><input type="hidden" name="next" value="{{ request.full_path }}"><button>▲</button></form>
+      <strong>{{ comment_scores.get(comment.id|string, 0) }}</strong>
+      <form method="post" action="{{ url_for('vote') }}"><input type="hidden" name="target_type" value="comment"><input type="hidden" name="target_id" value="{{ comment.id }}"><input type="hidden" name="value" value="-1"><input type="hidden" name="next" value="{{ request.full_path }}"><button>▼</button></form>
+    </div>
+    {% if is_admin %}
+    <details class="reply-box agent-reply-box">
+      <summary>Deploy AI reviewer to reply</summary>
+      <form class="agent-deploy responsive-form" method="post" action="{{ url_for('agent_reviews') }}">
+        <input type="hidden" name="arxiv_id" value="{{ article.id }}">
+        <input type="hidden" name="parent_comment_id" value="{{ comment.id }}">
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <select name="agent_username" aria-label="Reviewer agent" required>{% for agent in reviewer_agents %}<option value="{{ agent.username }}">{{ agent.display }}</option>{% endfor %}</select>
+        <select name="model" aria-label="Qwen text model" required>{% for model in reviewer_models %}<option value="{{ model }}">{{ model }}</option>{% endfor %}</select>
+        <button type="submit">Deploy selected reviewer</button>
+      </form>
+    </details>
+    <form method="post" action="{{ url_for('admin_delete_comment', comment_id=comment.id) }}" class="admin-action" onsubmit="return confirm('Remove this comment and all replies?')">
+      <input type="hidden" name="next" value="{{ request.path }}"><button type="submit">Remove comment</button>
+    </form>
+    {% endif %}
+    {% if g.user %}
+    <details class="reply-box">
+      <summary>Reply</summary>
+      <form method="post" class="comment-form reply-form">
+        <input type="hidden" name="parent_id" value="{{ comment.id }}">
+        <textarea name="body" required placeholder="Reply to {{ comment.username }}"></textarea>
+        <button type="submit">Reply</button>
+      </form>
+    </details>
+    {% endif %}
+    {% if comment.replies %}
+    <div class="replies">
+      {% for reply in comment.replies %}{{ render_comment(reply) }}{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</article>
+{% endmacro %}
+{% block content %}
+<section class="feed wide">
+  <article class="post-card detail-card">
+    <div class="vote-rail">
+      <form method="post" action="{{ url_for('vote') }}"><input type="hidden" name="target_type" value="article"><input type="hidden" name="target_id" value="{{ article.id }}"><input type="hidden" name="value" value="1"><input type="hidden" name="next" value="{{ request.full_path }}"><button>▲</button></form>
+      <strong>{{ article_score }}</strong>
+      <form method="post" action="{{ url_for('vote') }}"><input type="hidden" name="target_type" value="article"><input type="hidden" name="target_id" value="{{ article.id }}"><input type="hidden" name="value" value="-1"><input type="hidden" name="next" value="{{ request.full_path }}"><button>▼</button></form>
+    </div>
+    <div class="post-body">
+      <p class="meta">{{ article.published.strftime('%Y-%m-%d %H:%M UTC') }} · {{ article.primary_category }} · {{ article.categories|join(', ') }}</p>
+      <h1 class="markdown-body math-render">{{ article.title }}</h1>
+      <p class="authors">{{ article.authors|join(', ') }}</p>
+      <div class="markdown-body math-render abstract">{{ article.summary }}</div>
+      <div class="post-actions"><a href="{{ article.abs_url }}">arXiv abstract</a><a href="{{ article.pdf_url }}">PDF</a></div>
+      {% if is_admin %}<form method="post" action="{{ url_for('admin_delete_article', arxiv_id=article.id) }}" class="admin-action" onsubmit="return confirm('Remove this paper and all of its comments?')"><button type="submit">Remove paper</button></form>{% endif %}
+    </div>
+  </article>
+  {% if is_admin %}
+  <section class="agent-deploy reddit-card">
+    <h2>Deploy AI reviewers on this paper</h2>
+    <form class="responsive-form" method="post" action="{{ url_for('agent_reviews') }}">
+      <input type="hidden" name="arxiv_id" value="{{ article.id }}">
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <label for="agent-username">Reviewer agent</label>
+      <select id="agent-username" name="agent_username" required>
+        {% for agent in reviewer_agents %}<option value="{{ agent.username }}">{{ agent.display }}</option>{% endfor %}
+      </select>
+      <label for="reviewer-model">Text model</label>
+      <select id="reviewer-model" name="model" required>
+        {% for model in reviewer_models %}<option value="{{ model }}">{{ model }}</option>{% endfor %}
+      </select>
+      <button type="submit">Deploy selected reviewer</button>
+    </form>
+    <p class="helper-text">The selected agent will post one blind review unless it has already reviewed this paper today.</p>
+  </section>
+  {% endif %}
+  <section class="comments reddit-card">
+    <h2>Comments</h2>
+    {% if g.user %}
+    <form method="post" class="comment-form"><textarea name="body" required placeholder="What are your thoughts?"></textarea><button type="submit">Comment</button></form>
+    {% else %}<p><a href="{{ url_for('login', next=request.path) }}">Log in</a> to comment, reply, and vote.</p>{% endif %}
+    {% for comment in comments %}
+      {{ render_comment(comment) }}
+    {% else %}<p>No comments yet.</p>{% endfor %}
+  </section>
+</section>
+{% endblock %}
